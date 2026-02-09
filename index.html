@@ -3,9 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Registro de Famílias Azannianas</title>
-
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
-
 <style>
 :root{
   --bg:#050505;
@@ -21,7 +19,7 @@
 body{
   margin:0;
   font-family:"Segoe UI",sans-serif;
-  background:#000;
+  background:radial-gradient(circle at top,#111,#000);
   color:var(--text);
 }
 
@@ -95,6 +93,13 @@ button{
   cursor:pointer;
 }
 
+.buttons-row{
+  display:flex;
+  gap:.8rem;
+  justify-content:center;
+  width:100%;
+}
+
 .container{
   max-width:1000px;
   margin:2rem auto;
@@ -143,14 +148,11 @@ button{
 
 .hidden{display:none}
 
-.buttons-row{
-  display:flex;
-  gap:.8rem;
-  justify-content:center;
-  width:100%;
-  margin-top:.4rem;
+@media (max-width:600px){
+  input,button{width:100%}
+  .form-container,.search-container{flex-direction:column}
+  .buttons-row{flex-direction:column}
 }
-
 </style>
 </head>
 
@@ -167,17 +169,8 @@ button{
 
 <div class="form-container">
   <input id="personInput" placeholder="Nome Sobrenome">
-
-  <input id="birthdayInput"
-         placeholder="Aniversário (DDMM ou DD/MM)"
-         inputmode="numeric"
-         maxlength="5">
-
-  <input id="ageInput"
-         type="number"
-         min="0"
-         placeholder="Idade atual">
-
+  <input id="birthdayInput" placeholder="Aniversário (DDMM ou DD/MM)">
+  <input id="ageInput" type="number" min="0" placeholder="Idade atual">
   <div class="buttons-row">
     <button type="button" onclick="addPerson()">Adicionar</button>
     <button type="button" onclick="removePerson()">Remover</button>
@@ -219,8 +212,7 @@ const tabBirthdays=document.getElementById("tabBirthdays");
 let families={};
 
 const today=new Date();
-const todayKey=
- String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+const todayKey=String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
 const currentYear=today.getFullYear();
 
 searchInput.addEventListener("input",render);
@@ -270,26 +262,43 @@ function updateTotal(){
  totalCount.innerText=`Total de pessoas: ${t}`;
 }
 
-function addPerson(){
- const name=personInput.value.trim();
- const birthday=normalizeBirthday(birthdayInput.value);
- const age=parseInt(ageInput.value,10);
+// 🔥 ORGANIZA IDS AUTOMATICAMENTE EM ORDEM ALFABÉTICA DE FAMÍLIA + NOME
+function recalculateIds() {
+  let id = 1;
 
- if(!name||!birthday||isNaN(age)) return alert("Dados inválidos");
+  const orderedFamilies = Object.keys(families).sort((a,b)=>a.localeCompare(b,"pt-BR"));
 
- const family=name.split(" ").at(-1);
- families[family]??={};
- families[family][name]={
-  birthday,
-  age,
-  lastAgeUpdate: currentYear,
-  id:0
- };
+  orderedFamilies.forEach(family => {
+    const members = families[family];
 
- save();
- personInput.value="";
- birthdayInput.value="";
- ageInput.value="";
+    const orderedPeople = Object.keys(members).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+
+    orderedPeople.forEach(name => {
+      members[name].id = id++;
+    });
+  });
+}
+
+function addPerson() {
+  const name = personInput.value.trim();
+  const birthday = normalizeBirthday(birthdayInput.value);
+  const age = parseInt(ageInput.value, 10);
+
+  if (!name || !birthday || isNaN(age)) return alert("Dados inválidos");
+
+  const family = name.split(" ").at(-1);
+  families[family] ??= {};
+  families[family][name] = {
+    birthday,
+    age,
+    lastAgeUpdate: currentYear,
+    id: 0
+  };
+
+  save();
+  personInput.value = "";
+  birthdayInput.value = "";
+  ageInput.value = "";
 }
 
 function removePerson(){
@@ -305,14 +314,11 @@ function removePerson(){
  }
 }
 
-function save(){
- let id=1;
- Object.values(families).forEach(m=>{
-  Object.values(m).forEach(p=>p.id=id++);
- });
- set(ref(db,"families"),families);
- updateTotal();
- render();
+function save() {
+  recalculateIds();
+  set(ref(db,"families"), families);
+  updateTotal();
+  render();
 }
 
 function render(){
@@ -368,8 +374,7 @@ function renderBirthdays(){
    card.innerHTML=`<h3>${String(p.m).padStart(2,"0")}</h3>`;
    birthdaysView.appendChild(card);
   }
-  const isToday=
-   String(p.m).padStart(2,"0")+"-"+String(p.d).padStart(2,"0")===todayKey;
+  const isToday=String(p.m).padStart(2,"0")+"-"+String(p.d).padStart(2,"0")===todayKey;
   card.innerHTML+=`
    <div class="person-info ${isToday?"birthday-today":""}">
     <div>${p.n}
@@ -384,6 +389,7 @@ function renderBirthdays(){
 onValue(ref(db,"families"),s=>{
  families=s.val()||{};
  updateAgesIfBirthday();
+ recalculateIds();
  updateTotal();
  render();
 });
