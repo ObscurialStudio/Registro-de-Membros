@@ -19,7 +19,7 @@
 body{
   margin:0;
   font-family:"Segoe UI",sans-serif;
-  background:radial-gradient(circle at top,#111,#000);
+  background:#000;
   color:var(--text);
 }
 
@@ -37,6 +37,7 @@ header{
   justify-content:center;
   gap:1rem;
   margin:1.5rem 0;
+  flex-wrap:wrap;
 }
 
 .tabs button{
@@ -163,6 +164,7 @@ button{
 <div class="tabs">
   <button id="tabMembers" class="active">Membros</button>
   <button id="tabBirthdays">Aniversários</button>
+  <button id="tabToday">Aniversariantes do Dia</button>
 </div>
 
 <p id="totalCount">Total de pessoas: 0</p>
@@ -183,6 +185,7 @@ button{
 
 <div id="membersView" class="container"></div>
 <div id="birthdaysView" class="container hidden"></div>
+<div id="todayView" class="container hidden"></div>
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
@@ -203,11 +206,13 @@ const db=getDatabase(app);
 
 const membersView=document.getElementById("membersView");
 const birthdaysView=document.getElementById("birthdaysView");
+const todayView=document.getElementById("todayView");
 const searchInput=document.getElementById("searchInput");
 const totalCount=document.getElementById("totalCount");
 
 const tabMembers=document.getElementById("tabMembers");
 const tabBirthdays=document.getElementById("tabBirthdays");
+const tabToday=document.getElementById("tabToday");
 
 let families={};
 
@@ -217,21 +222,24 @@ const currentYear=today.getFullYear();
 
 searchInput.addEventListener("input",render);
 
-tabMembers.onclick=()=>{
- tabMembers.classList.add("active");
- tabBirthdays.classList.remove("active");
- membersView.classList.remove("hidden");
- birthdaysView.classList.add("hidden");
- render();
-};
+function activateTab(tab){
+  [tabMembers,tabBirthdays,tabToday].forEach(t=>t.classList.remove("active"));
+  tab.classList.add("active");
 
-tabBirthdays.onclick=()=>{
- tabBirthdays.classList.add("active");
- tabMembers.classList.remove("active");
- birthdaysView.classList.remove("hidden");
- membersView.classList.add("hidden");
- render();
-};
+  membersView.classList.add("hidden");
+  birthdaysView.classList.add("hidden");
+  todayView.classList.add("hidden");
+
+  if(tab===tabMembers) membersView.classList.remove("hidden");
+  if(tab===tabBirthdays) birthdaysView.classList.remove("hidden");
+  if(tab===tabToday) todayView.classList.remove("hidden");
+
+  render();
+}
+
+tabMembers.onclick=()=>activateTab(tabMembers);
+tabBirthdays.onclick=()=>activateTab(tabBirthdays);
+tabToday.onclick=()=>activateTab(tabToday);
 
 function normalizeBirthday(v){
  v=v.replace(/\D/g,"");
@@ -262,17 +270,12 @@ function updateTotal(){
  totalCount.innerText=`Total de pessoas: ${t}`;
 }
 
-// 🔥 ORGANIZA IDS AUTOMATICAMENTE EM ORDEM ALFABÉTICA DE FAMÍLIA + NOME
 function recalculateIds() {
   let id = 1;
-
   const orderedFamilies = Object.keys(families).sort((a,b)=>a.localeCompare(b,"pt-BR"));
-
   orderedFamilies.forEach(family => {
     const members = families[family];
-
     const orderedPeople = Object.keys(members).sort((a,b)=>a.localeCompare(b,"pt-BR"));
-
     orderedPeople.forEach(name => {
       members[name].id = id++;
     });
@@ -322,9 +325,9 @@ function save() {
 }
 
 function render(){
- tabMembers.classList.contains("active")
-  ? renderMembers()
-  : renderBirthdays();
+ if(tabMembers.classList.contains("active")) return renderMembers();
+ if(tabBirthdays.classList.contains("active")) return renderBirthdays();
+ if(tabToday.classList.contains("active")) return renderToday();
 }
 
 function renderMembers(){
@@ -384,6 +387,42 @@ function renderBirthdays(){
     </div>
    </div>`;
  });
+}
+
+function renderToday(){
+ todayView.innerHTML="";
+ const people=[];
+
+ Object.entries(families).forEach(([family,members])=>{
+  Object.entries(members).forEach(([n,p])=>{
+   if(p.birthday===todayKey){
+    people.push({n,family,age:p.age,id:p.id});
+   }
+  });
+ });
+
+ if(!people.length){
+  todayView.innerHTML=`<div class="family-card"><h3>Nenhum aniversariante hoje</h3></div>`;
+  return;
+ }
+
+ const card=document.createElement("div");
+ card.className="family-card";
+ card.innerHTML=`<h3>Aniversariantes de Hoje</h3>`;
+
+ people.sort((a,b)=>a.n.localeCompare(b.n,"pt-BR"));
+
+ people.forEach(p=>{
+  card.innerHTML+=`
+   <div class="person-info birthday-today">
+    <div>${p.n}
+     <div class="small">${p.family} • ${p.age} anos</div>
+    </div>
+    <div class="id">#${p.id}</div>
+   </div>`;
+ });
+
+ todayView.appendChild(card);
 }
 
 onValue(ref(db,"families"),s=>{
