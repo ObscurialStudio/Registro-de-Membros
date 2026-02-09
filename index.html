@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Registro de Hanashis</title>
+<title>Registro de Famílias Azannianas</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
 
@@ -64,7 +64,7 @@ header{
 
 .form-container,
 .search-container{
-  max-width:760px;
+  max-width:820px;
   margin:0 auto 1.2rem;
   padding:1rem;
   display:flex;
@@ -143,15 +143,20 @@ button{
 
 .hidden{display:none}
 
-@media(max-width:600px){
-  input,button{width:100%}
+.buttons-row{
+  display:flex;
+  gap:.8rem;
+  justify-content:center;
+  width:100%;
+  margin-top:.4rem;
 }
+
 </style>
 </head>
 
 <body>
 
-<header>Registro de Hanashis</header>
+<header>Registro de Famílias Azannianas</header>
 
 <div class="tabs">
   <button id="tabMembers" class="active">Membros</button>
@@ -162,9 +167,21 @@ button{
 
 <div class="form-container">
   <input id="personInput" placeholder="Nome Sobrenome">
-  <input id="birthdayInput" placeholder="Aniversário (DDMM ou DD/MM)">
-  <button onclick="addPerson()">Adicionar</button>
-  <button onclick="removePerson()">Remover</button>
+
+  <input id="birthdayInput"
+         placeholder="Aniversário (DDMM ou DD/MM)"
+         inputmode="numeric"
+         maxlength="5">
+
+  <input id="ageInput"
+         type="number"
+         min="0"
+         placeholder="Idade atual">
+
+  <div class="buttons-row">
+    <button type="button" onclick="addPerson()">Adicionar</button>
+    <button type="button" onclick="removePerson()">Remover</button>
+  </div>
 </div>
 
 <div class="search-container">
@@ -204,6 +221,7 @@ let families={};
 const today=new Date();
 const todayKey=
  String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+const currentYear=today.getFullYear();
 
 searchInput.addEventListener("input",render);
 
@@ -231,7 +249,22 @@ function normalizeBirthday(v){
  return String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0");
 }
 
-function updateTotalCount(){
+function updateAgesIfBirthday(){
+ let updated=false;
+ Object.values(families).forEach(members=>{
+  Object.values(members).forEach(p=>{
+   if(!p.birthday||p.age==null) return;
+   if(p.birthday===todayKey && p.lastAgeUpdate!==currentYear){
+    p.age++;
+    p.lastAgeUpdate=currentYear;
+    updated=true;
+   }
+  });
+ });
+ if(updated) set(ref(db,"families"),families);
+}
+
+function updateTotal(){
  let t=0;
  Object.values(families).forEach(m=>t+=Object.keys(m).length);
  totalCount.innerText=`Total de pessoas: ${t}`;
@@ -239,16 +272,24 @@ function updateTotalCount(){
 
 function addPerson(){
  const name=personInput.value.trim();
- const b=normalizeBirthday(birthdayInput.value);
- if(!name||!b) return alert("Dados inválidos");
+ const birthday=normalizeBirthday(birthdayInput.value);
+ const age=parseInt(ageInput.value,10);
+
+ if(!name||!birthday||isNaN(age)) return alert("Dados inválidos");
 
  const family=name.split(" ").at(-1);
- families[family] ??= {};
- families[family][name]={birthday:b,id:0};
+ families[family]??={};
+ families[family][name]={
+  birthday,
+  age,
+  lastAgeUpdate: currentYear,
+  id:0
+ };
 
  save();
  personInput.value="";
  birthdayInput.value="";
+ ageInput.value="";
 }
 
 function removePerson(){
@@ -270,7 +311,7 @@ function save(){
   Object.values(m).forEach(p=>p.id=id++);
  });
  set(ref(db,"families"),families);
- updateTotalCount();
+ updateTotal();
  render();
 }
 
@@ -283,7 +324,7 @@ function render(){
 function renderMembers(){
  membersView.innerHTML="";
  const q=searchInput.value.toLowerCase();
- Object.entries(families).sort().forEach(([family,members])=>{
+ Object.entries(families).forEach(([family,members])=>{
   const list=Object.entries(members).filter(([n,p])=>
    `${n} ${family} ${p.id}`.toLowerCase().includes(q)
   );
@@ -295,7 +336,11 @@ function renderMembers(){
    const [m,d]=p.birthday.split("-");
    card.innerHTML+=`
     <div class="person-info">
-     <div>${n}<div class="small">${d}/${m}</div></div>
+     <div>${n}
+      <div class="small">
+       ${d}/${m} • ${p.age} anos
+      </div>
+     </div>
      <div class="id">#${p.id}</div>
     </div>`;
   });
@@ -305,35 +350,15 @@ function renderMembers(){
 
 function renderBirthdays(){
  birthdaysView.innerHTML="";
- const q=searchInput.value.toLowerCase();
- const todayList=[],people=[];
-
+ const people=[];
  Object.entries(families).forEach(([family,members])=>{
   Object.entries(members).forEach(([n,p])=>{
    if(!p.birthday) return;
-   const key=`${n} ${family} ${p.birthday} ${p.id}`.toLowerCase();
-   if(q && !key.includes(q)) return;
    const [m,d]=p.birthday.split("-").map(Number);
-   people.push({n,family,m,d});
-   if(p.birthday===todayKey) todayList.push({n,family});
+   people.push({n,family,m,d,age:p.age});
   });
  });
-
- if(todayList.length){
-  const c=document.createElement("div");
-  c.className="family-card";
-  c.innerHTML=`<h3>🎉 Aniversariante de Hoje</h3>`;
-  todayList.forEach(p=>{
-   c.innerHTML+=`
-    <div class="person-info birthday-today">
-     <div>${p.n}<div class="small">${p.family}</div></div>
-    </div>`;
-  });
-  birthdaysView.appendChild(c);
- }
-
  people.sort((a,b)=>a.m-b.m||a.d-b.d);
-
  let cm=null,card;
  people.forEach(p=>{
   if(p.m!==cm){
@@ -348,7 +373,9 @@ function renderBirthdays(){
   card.innerHTML+=`
    <div class="person-info ${isToday?"birthday-today":""}">
     <div>${p.n}
-     <div class="small">${p.family} • ${String(p.d).padStart(2,"0")}/${String(p.m).padStart(2,"0")}</div>
+     <div class="small">
+      ${String(p.d).padStart(2,"0")}/${String(p.m).padStart(2,"0")} • ${p.family} • ${p.age} anos
+     </div>
     </div>
    </div>`;
  });
@@ -356,13 +383,13 @@ function renderBirthdays(){
 
 onValue(ref(db,"families"),s=>{
  families=s.val()||{};
- updateTotalCount();
+ updateAgesIfBirthday();
+ updateTotal();
  render();
 });
 
-/* 🔑 EXPOR FUNÇÕES PARA OS BOTÕES */
-window.addPerson = addPerson;
-window.removePerson = removePerson;
+window.addPerson=addPerson;
+window.removePerson=removePerson;
 </script>
 
 </body>
