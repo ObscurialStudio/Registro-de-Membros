@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Registro de Famílias Azannianas</title>
+<title>Registro de Hanashis</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -26,7 +26,7 @@ body{
 header{
   text-align:center;
   padding:2rem 1rem 1rem;
-  font-family:Rockwell,"Cinzel Decorative",serif;
+  font-family:"Rockwell","Cinzel Decorative",serif;
   font-size:2.4rem;
   color:var(--gold);
   border-bottom:1px solid rgba(212,175,55,.4);
@@ -159,7 +159,7 @@ button{
 
 <body>
 
-<header>Registro de Famílias Azannianas</header>
+<header>Registro de Hanashis</header>
 
 <div class="tabs">
   <button id="tabMembers" class="active">Membros</button>
@@ -170,9 +170,9 @@ button{
 <p id="totalCount">Total de pessoas: 0</p>
 
 <div class="form-container">
-  <input id="personInput" placeholder="Nome Sobrenome">
-  <input id="birthdayInput" placeholder="Aniversário (DDMM ou DD/MM)">
-  <input id="ageInput" type="number" min="0" placeholder="Idade atual">
+  <input id="personInput" placeholder="Nome & Sobrenome">
+  <input id="birthdayInput" placeholder="Data de Aniversário">
+  <input id="ageInput" type="number" min="0" placeholder="Idade Atual">
   <div class="buttons-row">
     <button type="button" onclick="addPerson()">Adicionar</button>
     <button type="button" onclick="removePerson()">Remover</button>
@@ -180,7 +180,7 @@ button{
 </div>
 
 <div class="search-container">
-  <input id="searchInput" placeholder="Buscar por nome, família ou ID">
+  <input id="searchInput" placeholder="Buscar por Nome, Família ou ID">
 </div>
 
 <div id="membersView" class="container"></div>
@@ -340,7 +340,8 @@ function renderMembers(){
   if(!list.length) return;
   const card=document.createElement("div");
   card.className="family-card";
-  card.innerHTML=`<h3>${family}</h3>`;
+  const count = Object.keys(members).length;
+  card.innerHTML=`<h3>${family} (${String(count).padStart(2,"0")} membros)</h3>`;
   list.forEach(([n,p])=>{
    const [m,d]=p.birthday.split("-");
    card.innerHTML+=`
