@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Registro de Hanashis</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#0a0a0a;
+  --card:#141414;
+  --gold:#d4af37;
+  --red:#8b0000;
+  --text:#f2f2f2;
+  --muted:#9a9a9a;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:"Segoe UI",sans-serif;
+  background:#000;
+  color:var(--text);
+}
+
+header{
+  text-align:center;
+  padding:2rem 1rem 1rem;
+  font-family:Rockwell,"Cinzel Decorative",serif;
+  font-size:2.4rem;
+  color:var(--gold);
+  border-bottom:1px solid rgba(212,175,55,.4);
+}
+
+.tabs{
+  display:flex;
+  justify-content:center;
+  gap:1rem;
+  margin:1.5rem 0;
+}
+
+.tabs button{
+  background:#111;
+  color:var(--gold);
+  border:1px solid rgba(212,175,55,.4);
+  padding:.6rem 1.4rem;
+  border-radius:10px;
+  font-family:Rockwell;
+  cursor:pointer;
+}
+
+.tabs button.active{
+  background:linear-gradient(135deg,var(--red),var(--gold));
+  color:white;
+}
+
+#totalCount{
+  text-align:center;
+  color:var(--muted);
+  margin-bottom:1.5rem;
+}
+
+.form-container,
+.search-container{
+  max-width:760px;
+  margin:0 auto 1.2rem;
+  padding:1rem;
+  display:flex;
+  flex-wrap:wrap;
+  gap:.8rem;
+  justify-content:center;
+  background:var(--card);
+  border-radius:14px;
+  border:1px solid rgba(212,175,55,.25);
+}
+
+input{
+  background:#0f0f0f;
+  color:var(--text);
+  border:1px solid rgba(212,175,55,.4);
+  border-radius:10px;
+  padding:.6rem .9rem;
+  min-width:200px;
+}
+
+button{
+  background:linear-gradient(135deg,var(--red),var(--gold));
+  color:white;
+  border:none;
+  padding:.6rem 1.2rem;
+  border-radius:10px;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.container{
+  max-width:1000px;
+  margin:2rem auto;
+  padding:0 1rem 3rem;
+}
+
+.family-card{
+  background:var(--card);
+  border-radius:16px;
+  padding:1.2rem 1.4rem;
+  margin-bottom:1.8rem;
+  border:1px solid rgba(212,175,55,.25);
+}
+
+.family-card h3{
+  margin:0 0 1rem;
+  font-family:Rockwell;
+  color:var(--gold);
+  border-bottom:1px solid rgba(212,175,55,.35);
+}
+
+.person-info{
+  display:flex;
+  justify-content:space-between;
+  padding:.55rem 0;
+  border-bottom:1px solid #262626;
+}
+
+.person-info:last-child{border-bottom:none}
+
+.person-info .id{
+  color:var(--gold);
+  font-size:.8rem;
+}
+
+.birthday-today{
+  background:rgba(212,175,55,.12);
+  border-left:3px solid var(--gold);
+  padding-left:.6rem;
+}
+
+.small{
+  font-size:.8rem;
+  color:var(--muted);
+}
+
+.hidden{display:none}
+
+@media(max-width:600px){
+  input,button{width:100%}
+}
+</style>
+</head>
+
+<body>
+
+<header>Registro de Hanashis</header>
+<h2> </h2>
+
+<div class="tabs">
+  <button id="tabMembers" class="active">Membros</button>
+  <button id="tabBirthdays">Aniversários</button>
+</div>
+
+<p id="totalCount">Total de pessoas: 0</p>
+
+<div class="form-container">
+  <input id="personInput" placeholder="Nome Sobrenome">
+  <input id="birthdayInput" placeholder="Aniversário (DDMM ou DD/MM)">
+  <button onclick="addPerson()">Adicionar</button>
+  <button onclick="removePerson()">Remover</button>
+</div>
+
+<div class="search-container">
+  <input id="searchInput" placeholder="Buscar por nome, família ou ID">
+</div>
+
+<div id="membersView" class="container"></div>
+<div id="birthdaysView" class="container hidden"></div>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+import {getDatabase,ref,set,onValue} from "https://www.gstatic.com/firebasejs/9.6.10/firebase-database.js";
+
+const firebaseConfig={
+ apiKey:"AIzaSyCk8lyH30LX3QYClhZWlUXlkb4XdH0RXBU",
+ authDomain:"listagem-multiversal.firebaseapp.com",
+ databaseURL:"https://listagem-multiversal-default-rtdb.firebaseio.com",
+ projectId:"listagem-multiversal",
+ storageBucket:"listagem-multiversal.firebasestorage.app",
+ messagingSenderId:"30434611532",
+ appId:"1:30434611532:web:1d793498b16a820e2d7fe9"
+};
+
+const app=initializeApp(firebaseConfig);
+const db=getDatabase(app);
+
+const membersView=document.getElementById("membersView");
+const birthdaysView=document.getElementById("birthdaysView");
+const searchInput=document.getElementById("searchInput");
+const totalCount=document.getElementById("totalCount");
+
+const tabMembers=document.getElementById("tabMembers");
+const tabBirthdays=document.getElementById("tabBirthdays");
+
+let families={};
+
+const today=new Date();
+const todayKey=String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+
+searchInput.addEventListener("input",render);
+
+tabMembers.onclick=()=>{
+ tabMembers.classList.add("active");
+ tabBirthdays.classList.remove("active");
+ membersView.classList.remove("hidden");
+ birthdaysView.classList.add("hidden");
+ render();
+};
+
+tabBirthdays.onclick=()=>{
+ tabBirthdays.classList.add("active");
+ tabMembers.classList.remove("active");
+ birthdaysView.classList.remove("hidden");
+ membersView.classList.add("hidden");
+ render();
+};
+
+function normalizeBirthday(v){
+ v=v.replace(/\D/g,"");
+ if(v.length!==4) return null;
+ const d=v.slice(0,2),m=v.slice(2);
+ if(+d<1||+d>31||+m<1||+m>12) return null;
+ return m+"-"+d;
+}
+
+function addPerson(){
+ const name=personInput.value.trim();
+ const b=normalizeBirthday(birthdayInput.value);
+ if(!name||!b) return alert("Dados inválidos");
+
+ const parts=name.split(" ");
+ const family=parts.at(-1);
+
+ if(!families[family]) families[family]={};
+ families[family][name]={birthday:b,id:0};
+
+ save();
+ personInput.value="";
+ birthdayInput.value="";
+}
+
+function removePerson(){
+ const name=personInput.value.trim();
+ if(!name) return;
+ for(const f in families){
+   if(families[f][name]){
+     delete families[f][name];
+     if(!Object.keys(families[f]).length) delete families[f];
+     save();
+     break;
+   }
+ }
+}
+
+function save(){
+  let id = 1;
+  Object.values(families).forEach(m=>{
+    Object.values(m).forEach(p=>{
+      p.id = id++;
+    });
+  });
+
+  set(ref(db,"families"),families);
+  updateTotalCount();
+  render();
+}
+
+
+function render(){
+ tabMembers.classList.contains("active") ? renderMembers() : renderBirthdays();
+}
+
+function renderMembers(){
+ membersView.innerHTML="";
+ const q=searchInput.value.toLowerCase();
+ Object.entries(families).sort().forEach(([family,members])=>{
+  const list=Object.entries(members).filter(([n,p])=>
+   `${n} ${family} ${p.id}`.toLowerCase().includes(q)
+  );
+  if(!list.length) return;
+  const card=document.createElement("div");
+  card.className="family-card";
+  card.innerHTML=`<h3>${family}</h3>`;
+  list.forEach(([n,p])=>{
+   const [m,d]=p.birthday.split("-");
+   card.innerHTML+=`
+    <div class="person-info">
+     <div>${n}<div class="small">${d}/${m}</div></div>
+     <div class="id">#${p.id}</div>
+    </div>`;
+  });
+  membersView.appendChild(card);
+ });
+}
+
+function renderBirthdays(){
+  birthdaysView.innerHTML="";
+  const q = searchInput.value.toLowerCase();
+
+  const todayList = [];
+  const people = [];
+
+  Object.entries(families).forEach(([family, members]) => {
+    Object.entries(members).forEach(([name, p]) => {
+      if (!p.birthday) return;
+
+      const key = `${name} ${family} ${p.birthday} ${p.id}`.toLowerCase();
+      if (q && !key.includes(q)) return;
+
+      const [m, d] = p.birthday.split("-").map(Number);
+
+      // Sempre entra na lista geral
+      people.push({ name, family, m, d });
+
+      // Se for hoje, entra TAMBÉM no destaque
+      if (p.birthday === todayKey) {
+        todayList.push({ name, family });
+      }
+    });
+  });
+
+  /* 🎉 ANIVERSARIANTES DE HOJE */
+  if (todayList.length) {
+    const card = document.createElement("div");
+    card.className = "family-card";
+    card.innerHTML = `<h3>🎉 Aniversariante${todayList.length > 1 ? "s" : ""} de Hoje</h3>`;
+
+    todayList.forEach(p => {
+      card.innerHTML += `
+        <div class="person-info birthday-today">
+          <div>
+            ${p.name}
+            <div class="small">${p.family}</div>
+          </div>
+        </div>`;
+    });
+
+    birthdaysView.appendChild(card);
+  }
+
+  if (!people.length) {
+    birthdaysView.innerHTML +=
+      `<p style="text-align:center;color:#777;">Nenhum resultado encontrado.</p>`;
+    return;
+  }
+
+  /* 📅 LISTA MENSAL COMPLETA */
+  people.sort((a, b) => a.m - b.m || a.d - b.d);
+
+  let currentMonth = null;
+  let monthCard;
+
+  people.forEach(p => {
+    if (p.m !== currentMonth) {
+      currentMonth = p.m;
+      monthCard = document.createElement("div");
+      monthCard.className = "family-card";
+      monthCard.innerHTML = `<h3>${String(p.m).padStart(2,"0")}</h3>`;
+      birthdaysView.appendChild(monthCard);
+    }
+
+    const isToday =
+      String(p.m).padStart(2,"0") + "-" + String(p.d).padStart(2,"0") === todayKey;
+
+    monthCard.innerHTML += `
+      <div class="person-info ${isToday ? "birthday-today" : ""}">
+        <div>
+          ${p.name}
+          <div class="small">
+            ${p.family} • ${String(p.d).padStart(2,"0")}/${String(p.m).padStart(2,"0")}
+          </div>
+        </div>
+      </div>`;
+  });
+}
+
+function updateTotalCount(){
+  let total = 0;
+  Object.values(families).forEach(members=>{
+    total += Object.keys(members).length;
+  });
+  totalCount.innerText = `Total de pessoas: ${total}`;
+}
+
+
+onValue(ref(db,"families"), s => {
+  families = s.val() || {};
+  updateTotalCount();
+  render();
+});
+
+</script>
+
+</body>
+</html>
